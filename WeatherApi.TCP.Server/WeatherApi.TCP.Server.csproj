@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>542286b8-6cc9-4c92-b55f-b1a215c75e99</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WeatherApi.TCP.Client\WeatherApi.TCP.Client.csproj" />
+    <ProjectReference Include="..\WeatherApi.TCP.Shared\WeatherApi.TCP.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
