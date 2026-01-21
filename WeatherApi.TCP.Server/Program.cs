@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Microsoft.Extensions.Configuration;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -8,22 +9,28 @@ using WeatherApi.TCP.Shared;
 // --- CONFIGURATION ---
 // --------------------------------------------------------------------------------
 const int port = 8888;
-var apiKey = Environment.GetEnvironmentVariable("MY_PROJECT_API_KEY");
+// Đọc key từ biến môi trường hoặc User Secrets
+var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+    .AddUserSecrets<Program>() // Cần package: Microsoft.Extensions.Configuration.UserSecrets
+    .Build();
+
+// Ưu tiên lấy từ User Secrets, nếu không có thì lấy Environment (cho server)
+var apiKey = config["MY_PROJECT_API_KEY"] ?? Environment.GetEnvironmentVariable("MY_PROJECT_API_KEY");
+
 var ipEndpoint = new IPEndPoint(IPAddress.Any, port);
 
-// Fix: 'new' expression simplified
 using HttpClient httpClient = new();
 
 // --------------------------------------------------------------------------------
 // --- START SERVER ---
 // --------------------------------------------------------------------------------
-// Fix: 'new' expression simplified
 TcpListener server = new(ipEndpoint);
 
 try
 {
     server.Start();
-    Console.WriteLine($"[SERVER] Weather Server Online on Port {port}...");
+    Console.WriteLine($"[SERVER] JSON Weather Server Online on Port {port}...");
+    Console.WriteLine($"[INFO] Mode: Serving JSON Data for WinForms Client");
 
     while (true)
     {
@@ -35,19 +42,21 @@ try
         byte[] buffer = new byte[1024];
         int bytesRead = await stream.ReadAsync(buffer);
 
-        // Fix: Xử lý null warning
+        if (bytesRead == 0) { client.Close(); continue; }
+
         string cityName = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
         Console.WriteLine($"[REQUEST]: '{cityName}'");
 
-        string responseMessage = await GetWeatherTable(httpClient, cityName, apiKey);
+        // Gọi hàm lấy JSON thay vì hàm lấy bảng
+        string jsonResponse = await GetWeatherJson(httpClient, cityName, apiKey);
 
-        if (!string.IsNullOrEmpty(responseMessage))
+        if (!string.IsNullOrEmpty(jsonResponse))
         {
-            byte[] responseBytes = Encoding.UTF8.GetBytes(responseMessage);
+            byte[] responseBytes = Encoding.UTF8.GetBytes(jsonResponse);
             await stream.WriteAsync(responseBytes);
         }
 
-        Console.WriteLine("[SERVER]: Sent detailed table.");
+        Console.WriteLine("[SERVER]: Sent JSON data.");
         client.Close();
     }
 }
@@ -63,79 +72,43 @@ finally
 // --------------------------------------------------------------------------------
 // --- HELPER ---
 // --------------------------------------------------------------------------------
-static async Task<string> GetWeatherTable(HttpClient http, string city, string key)
+static async Task<string> GetWeatherJson(HttpClient http, string city, string key)
 {
     try
     {
-        string url = $"http://api.weatherapi.com/v1/forecast.json?key={key}&q={city}&days=3&aqi=no&alerts=no";
+        if (string.IsNullOrEmpty(key))
+        {
+            // Trả về lỗi dạng JSON để Frontend hứng được
+            return JsonSerializer.Serialize(new { Error = true, Message = "Server API Key is missing" });
+        }
 
+        string url = $"http://api.weatherapi.com/v1/forecast.json?key={key}&q={city}&days=3&aqi=no&alerts=no";
         var response = await http.GetAsync(url);
 
         if (!response.IsSuccessStatusCode)
-            return $"ERROR: City '{city}' not found or API Key issue.";
-
-        string jsonString = await response.Content.ReadAsStringAsync();
-        var data = JsonSerializer.Deserialize<WeatherModel>(jsonString);
-
-        // Fix: Dereference of a possibly null reference
-        if (data?.Current == null || data?.Location == null)
-            return "ERROR: Data is empty.";
-
-        var r = data;
-        var c = r.Current;
-        var l = r.Location;
-
-        StringBuilder sb = new(); // Fix: Simplified new
-
-        sb.AppendLine("\n╔════════════════════════════════════════════════════════════════════╗");
-        sb.AppendLine($"║  🌍 WEATHER REPORT FOR: {l.Name?.ToUpper()}, {l.Country?.ToUpper()}");
-        sb.AppendLine("╠════════════════════════════════════════════════════════════════════╣");
-
-        sb.AppendLine("║  [📍 INFO & LOCATION]");
-        sb.AppendLine($"║   • Region:     {l.Region,-20}  • Timezone: {l.TzId}");
-        sb.AppendLine($"║   • Lat/Lon:    {l.Lat}/{l.Lon}          • Local Time: {l.LocalTime}");
-        sb.AppendLine("║");
-
-        sb.AppendLine("║  [🌡️ CURRENT STATUS]");
-        sb.AppendLine($"║   • Condition:  {c.Condition?.Text} ({(c.IsDay == 1 ? "Day" : "Night")})");
-
-        // --- CHỖ NÀY GIỜ SẼ HẾT LỖI VÌ ĐÃ CÓ TempF Ở MODEL ---
-        sb.AppendLine($"║   • Temp:       {c.TempC}°C / {c.TempF}°F     • Feels Like: {c.FeelsLikeC}°C");
-
-        sb.AppendLine($"║   • UV Index:   {c.Uv,-20}  • Visibility: {c.VisKm} km");
-        sb.AppendLine("║");
-
-        sb.AppendLine("║  [💨 WIND & ATMOSPHERE]");
-        sb.AppendLine($"║   • Wind:       {c.WindKph} km/h ({c.WindDir})   • Gust: {c.GustKph} km/h");
-        sb.AppendLine($"║   • Humidity:   {c.Humidity}%                 • Cloud: {c.Cloud}%");
-        sb.AppendLine($"║   • Pressure:   {c.PressureMb} mb            • Precip: {c.PrecipMm} mm");
-
-        sb.AppendLine("╠════════════════════════════════════════════════════════════════════╣");
-        sb.AppendLine("║  [📅 3-DAY FORECAST]                                               ║");
-        sb.AppendLine("╠════════════════════════════════════════════════════════════════════╣");
-
-        if (r.Forecast?.ForecastDay != null)
         {
-            foreach (var f in r.Forecast.ForecastDay)
-            {
-                var d = f.Day;
-                // Fix: Thêm check null cho d
-                if (d == null) continue;
-
-                sb.AppendLine($"║  DATE: {f.Date}  |  {d.Condition?.Text}");
-                sb.AppendLine($"║  🌡️ Max/Min: {d.MaxTempC}°C / {d.MinTempC}°C   |  ☔ Rain Chance: {d.DailyChanceOfRain}%");
-                sb.AppendLine($"║  💨 Wind: {d.MaxWindKph} km/h         |  💧 Avg Humid: {d.AvgHumidity}%");
-                sb.AppendLine("╟────────────────────────────────────────────────────────────────────╢");
-            }
+            return JsonSerializer.Serialize(new { Error = true, Message = $"City '{city}' not found or API Error." });
         }
 
-        sb.AppendLine($"║  (Last Updated: {c.LastUpdated})");
-        sb.AppendLine("╚════════════════════════════════════════════════════════════════════╝");
+        string jsonString = await response.Content.ReadAsStringAsync();
 
-        return sb.ToString();
+        // Deserialize để kiểm tra dữ liệu có hợp lệ không trước khi gửi
+        var data = JsonSerializer.Deserialize<WeatherModel>(jsonString);
+
+        if (data?.Current == null || data?.Location == null)
+        {
+            return JsonSerializer.Serialize(new { Error = true, Message = "Data from API is empty." });
+        }
+
+        // --- QUAN TRỌNG: Serialize lại object thành JSON để gửi cho Client ---
+        // Frontend sẽ nhận được chuỗi kiểu: {"location":{...}, "current":{...}, ...}
+        return JsonSerializer.Serialize(data);
     }
     catch (Exception ex)
     {
-        return $"SYSTEM ERROR: {ex.Message}";
+        return JsonSerializer.Serialize(new { Error = true, Message = $"System Error: {ex.Message}" });
     }
 }
+
+// Class giả để hỗ trợ UserSecrets nếu dùng Top-level statements
+public partial class Program { }

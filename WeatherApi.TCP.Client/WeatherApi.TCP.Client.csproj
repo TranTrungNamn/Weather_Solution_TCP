@@ -7,4 +7,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\WeatherApi.TCP.Shared\WeatherApi.TCP.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -2,6 +2,7 @@
 
 namespace WeatherApi.TCP.Shared
 {
+    // --- GIỮ NGUYÊN CODE CŨ CỦA BẠN TỪ ĐÂY ---
     public class WeatherModel
     {
         [JsonPropertyName("location")]
@@ -29,10 +30,7 @@ namespace WeatherApi.TCP.Shared
     {
         [JsonPropertyName("last_updated")] public string? LastUpdated { get; set; }
         [JsonPropertyName("temp_c")] public double TempC { get; set; }
-
-        // --- ĐÂY LÀ BIẾN BẠN ĐANG THIẾU ---
-        [JsonPropertyName("temp_f")] public double TempF { get; set; }
-
+        [JsonPropertyName("temp_f")] public double TempF { get; set; } // Đã có cái này là OK
         [JsonPropertyName("is_day")] public int IsDay { get; set; }
         [JsonPropertyName("condition")] public Condition? Condition { get; set; }
         [JsonPropertyName("wind_kph")] public double WindKph { get; set; }
@@ -74,4 +72,12 @@ namespace WeatherApi.TCP.Shared
         [JsonPropertyName("daily_chance_of_rain")] public int DailyChanceOfRain { get; set; }
         [JsonPropertyName("condition")] public Condition? Condition { get; set; }
     }
+
+    // --- ERROR ---
+    public class ServerError
+    {
+        public bool Error { get; set; }
+        public string? Message { get; set; }
+    }
 }
+
