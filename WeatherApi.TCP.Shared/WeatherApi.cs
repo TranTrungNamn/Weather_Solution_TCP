@@ -60,6 +60,20 @@ namespace WeatherApi.TCP.Shared
     {
         [JsonPropertyName("date")] public string? Date { get; set; }
         [JsonPropertyName("day")] public Day? Day { get; set; }
+
+        // --- [MỚI] THÊM PHẦN NÀY ĐỂ HỨNG DỮ LIỆU GIỜ ---
+        [JsonPropertyName("hour")]
+        public List<Hour>? Hour { get; set; }
+    }
+
+    // --- CLASS ĐẠI DIỆN CHO TỪNG GIỜ ---
+    public class Hour
+    {
+        [JsonPropertyName("time")] public string? Time { get; set; } // Dạng "2024-01-22 15:00"
+        [JsonPropertyName("temp_c")] public double TempC { get; set; }
+        [JsonPropertyName("condition")] public Condition? Condition { get; set; }
+        [JsonPropertyName("chance_of_rain")] public int ChanceOfRain { get; set; }
+        [JsonPropertyName("wind_kph")] public double WindKph { get; set; }
     }
 
     public class Day
